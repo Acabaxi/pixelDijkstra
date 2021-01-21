@@ -9,28 +9,6 @@ from scipy.optimize import curve_fit
 import piecewise_fit
 
 
-def check_border_intersect(bl, br, tl, tr):
-    if bl[0] != tl[0]:
-        print(bl, br, tl, tr)
-        A1 = (bl[1] - br[1]) / (bl[0] - br[0])
-        A2 = (tl[1] - tr[1]) / (tl[0] - tr[0])
-        b1 = bl[1] - A1 * bl[0]
-        b2 = tl[1] - A2 * tl[0]
-
-        Xa = (b2 - b1) / (A1 - A2)
-        Ya = A1 * Xa + b1
-
-        if ((Xa < max(min(bl[0], br[0]), min(tl[0], tr[0]))) or
-                (Xa > min(max(bl[0], br[0]), max(tl[0], tr[0])))):
-            t = 1
-        else:
-            print("Flip")
-            tmp = tr
-            tr = tl
-            tl = tmp
-            return True
-
-    return False
 
 
 def rgb_draw_img(img_):
@@ -67,8 +45,6 @@ def biggest_contour_line(contour_):
     (contour_[b[1]][0][0], contour_[b[1]][0][1]), 255)
 
 
-def tuple_format(ar_):
-    return ar_[0], ar_[1]
 
 
 def draw_get_contour(img_, contours_, i_):
@@ -81,6 +57,7 @@ def draw_get_contour(img_, contours_, i_):
     pts_list_cv_ = np.array(list(zip(pts_[1], pts_[0])))
 
     return draw_img_, pts_list_, pts_list_cv_
+
 
 if __name__ == '__main__':
     print('PyCharm')
@@ -149,25 +126,13 @@ if __name__ == '__main__':
         # plt.imshow(draw_img_2)
         # plt.show()
 
-    # zone_boundary_list[1].flip_line()
-    # left_limits = [zone_boundary_list[0][0][0], zone_boundary_list[0][-1][0]]
-    left_limits = zone_boundary_list[0].get_limits()
-    # right_limits = [zone_boundary_list[1][0][0], zone_boundary_list[1][-1][0]]
-    right_limits = zone_boundary_list[1].get_limits()
-
-    if check_border_intersect(left_limits[0], right_limits[0], left_limits[1], right_limits[1]):
-        print("Flipping")
-        zone_boundary_list[0].flip_line()
-
-    zz = np.zeros(img.shape[:2], dtype=np.uint8)
-    zz = cv.polylines(zz, [zone_boundary_list[0].get_points()], color=255, isClosed=False)
-    zz = cv.polylines(zz, [zone_boundary_list[1].get_points()], color=255, isClosed=False)
-
-    zz = cv.line(zz, tuple_format(zone_boundary_list[0].get_limits()[0]), tuple_format(zone_boundary_list[1].get_limits()[0]), color=255)
-    zz = cv.line(zz, tuple_format(zone_boundary_list[0].get_limits()[1]),
-                 tuple_format(zone_boundary_list[1].get_limits()[1]), color=255)
-
+    region_obj = piecewise_fit.LineRegion(zone_boundary_list)
+    aa = region_obj.draw_boundary_polyline(img.shape)
     plt.figure()
-    plt.imshow(zz)
+    plt.imshow(aa)
     plt.show()
+
+    # plt.figure()
+    # plt.imshow(zz)
+    # plt.show()
 
