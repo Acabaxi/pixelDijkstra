@@ -1,16 +1,18 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import math
 
 
 class FloodFill:
     def __init__(self, image, points):
         self.image_shape = image.shape[:2]
-        self.map = np.full(self.image_shape, -1500, dtype=np.int16)
+        self.points = points
+        self.map = np.full(self.image_shape, -1, dtype=np.float64)
         self.visited = np.zeros(self.image_shape, dtype=bool)
         self.inside_pts = np.zeros(self.image_shape, dtype=bool)
         for pt in points:
             self.inside_pts[pt] = True
-            self.map[pt] = 9999
+            self.map[pt] = math.inf
         self.map[points[0]] = 0
         self.point_q = [points[0]]
 
@@ -42,7 +44,6 @@ class FloodFill:
         return self.map
 
     def add_to_q(self, pt_tuple):
-
         if pt_tuple not in self.point_q:
             self.point_q.append(pt_tuple)
 
@@ -50,6 +51,30 @@ class FloodFill:
         while len(self.point_q) > 0:
             curr_pt = self.point_q.pop(0)
             self.fill(curr_pt, 0)
-            # plt.figure()
-            # plt.imshow(self.map)
-            # plt.show()
+
+        idx = np.unravel_index(np.argmax(self.map, axis=None), self.map.shape)
+        return idx
+
+    def reset_structures(self):
+        self.map = np.full(self.image_shape, -1, dtype=np.float64)
+        self.visited = np.zeros(self.image_shape, dtype=bool)
+        for pt in self.points:
+            self.map[pt] = math.inf
+
+    def double_run(self):
+        # Run algorithm on random point on the shape
+        max_first_run = self.cycle_q()
+
+        # Reset distance map
+        self.reset_structures()
+
+        self.map[max_first_run] = 0
+        self.point_q = [max_first_run]
+
+        max_second_run = self.cycle_q()
+
+        return max_first_run, max_second_run
+
+    def sort_points(self):
+        sorted_list = sorted(self.points, key=lambda x: self.map[x])
+        return sorted_list
