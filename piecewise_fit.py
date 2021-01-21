@@ -16,9 +16,20 @@ def linearize_y_mx_b(endpoints):
     return m, b
 
 
+def intersect_point(line1, line2):
+    m1, b1 = linearize_y_mx_b(line1)
+    m2, b2 = linearize_y_mx_b(line2)
+
+    if m1 != m2:
+        xa = (b2 - b1) / (m1 - m2)
+        ya = m1 * xa + b1
+
+    return xa, ya, m1, b1, m2, b2
+
+
 def check_border_intersect(bl, br, tl, tr):
     if bl[0] != tl[0]:
-        print(bl, br, tl, tr)
+        # print(bl, br, tl, tr)
         A1 = (bl[1] - br[1]) / (bl[0] - br[0])
         A2 = (tl[1] - tr[1]) / (tl[0] - tr[0])
         b1 = bl[1] - A1 * bl[0]
@@ -106,7 +117,7 @@ class LineRegion:
             shape_ = img_shape
 
         zz = np.zeros(shape_, dtype=np.uint8)
-        zz = cv.polylines(zz, [self.boundary_polyline], color=255, isClosed=True)
+        zz = cv.polylines(zz, [self.boundary_polyline], color=255, isClosed=False)
         return zz
         # zz = cv.polylines(zz, [zone_boundary_list[0].get_points()], color=255, isClosed=False)
         # zz = cv.polylines(zz, [zone_boundary_list[1].get_points()], color=255, isClosed=False)

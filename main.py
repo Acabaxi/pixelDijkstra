@@ -9,8 +9,6 @@ from scipy.optimize import curve_fit
 import piecewise_fit
 
 
-
-
 def rgb_draw_img(img_):
     new_shape = img_.shape[:2] + (3,)
     draw_img_ = np.zeros(new_shape, dtype=np.uint8)
@@ -45,8 +43,6 @@ def biggest_contour_line(contour_):
     (contour_[b[1]][0][0], contour_[b[1]][0][1]), 255)
 
 
-
-
 def draw_get_contour(img_, contours_, i_):
     draw_img_ = np.zeros(img_.shape[:2], dtype=np.uint8)
     draw_img_ = cv.drawContours(draw_img_, contours_, i_, 255, thickness=cv.FILLED, )
@@ -59,10 +55,21 @@ def draw_get_contour(img_, contours_, i_):
     return draw_img_, pts_list_, pts_list_cv_
 
 
+def clean_big_objects(img_):
+    elem = cv.getStructuringElement(cv.MORPH_RECT, (10, 10))
+    ay = cv.morphologyEx(img, cv.MORPH_OPEN, elem)
+    ay = cv.dilate(ay, elem)
+    ay = cv.subtract(img_, ay)
+
+    return ay
+
+
 if __name__ == '__main__':
     print('PyCharm')
-    img = cv.imread("./zone_draw.png", 0)
+    img = cv.imread("./zone_draw_hard.png", 0)
     print(img.shape)
+
+    img = clean_big_objects(img)
 
     contours, hierarchy = cv.findContours(img, mode=cv.RETR_EXTERNAL, method=cv.CHAIN_APPROX_NONE)
 
@@ -128,11 +135,40 @@ if __name__ == '__main__':
 
     region_obj = piecewise_fit.LineRegion(zone_boundary_list)
     aa = region_obj.draw_boundary_polyline(img.shape)
+
+    sub_line = zone_boundary_list[0].get_points()[:2]
+    sub_line_2 = zone_boundary_list[1].get_points()[-2:]
+    xa, ya, m1, b1, m2, b2 = piecewise_fit.intersect_point(sub_line, sub_line_2)
+    print(xa, ya, m1, b1, m2, b2)
+
+    ####
+    line_y = lambda m, x, b: m * x + b
+    line_x = lambda m, y, b: (y - b) / m
+
+    if xa < 0 or xa > img.shape[1] or ya < 0 or ya > img.shape[0]:
+        intersect_0 = line_x(m1, 0, b1)
+        intersect_max = line_x(m1, img.shape[0], b1)
+        aa[0:0 + 5, int(intersect_0 - 5):int(intersect_0 + 5)] = 255
+
+        intersect_0 = line_x(m2, 0, b2)
+        intersect_max = line_x(m2, img.shape[0], b2)
+        aa[0:0 + 5, int(intersect_0 - 5):int(intersect_0 + 5)] = 255
+
+        print(intersect_0, intersect_max)
+
+    print(sub_line[0]-5, sub_line[0]+5)
+    aa[sub_line[0][1]-5:sub_line[0][1]+5, sub_line[0][0]-5:sub_line[0][0]+5] = 255
+    aa[sub_line[1][1] - 5:sub_line[1][1] + 5, sub_line[1][0] - 5:sub_line[1][0] + 5] = 255
+    aa[sub_line_2[0][1] - 5:sub_line_2[0][1] + 5, sub_line_2[0][0] - 5:sub_line_2[0][0] + 5] = 255
+    aa[sub_line_2[1][1] - 5:sub_line_2[1][1] + 5, sub_line_2[1][0] - 5:sub_line_2[1][0] + 5] = 255
+
     plt.figure()
     plt.imshow(aa)
     plt.show()
 
+    # piecewise_fit.intersect_point()
     # plt.figure()
     # plt.imshow(zz)
     # plt.show()
+
 
