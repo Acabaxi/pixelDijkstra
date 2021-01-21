@@ -2,13 +2,24 @@ import numpy as np
 import cv2 as cv
 
 
-class PiecewiseFit:
-    def __init__(self, start, end, contour_points, distance_map):
-        self.points = contour_points
-        self.distance_map = distance_map
+class LineClass:
+    def __init__(self, points):
+        self.points = points
+        self.limits = [points[0], points[1]]
+        # self.distance_map = distance_map
 
-        self.edges = [start, end]
-        self.edges_distance = [self.distance_map[start], self.distance_map[end]]
+        # self.edges = [start, end]
+        # self.edges_distance = [self.distance_map[start], self.distance_map[end]]
+
+    def flip_line(self):
+        self.points = self.points[::-1]
+        self.limits = self.limits[::-1]
+
+    def get_limits(self):
+        return self.points[0], self.points[-1]
+
+    def get_points(self):
+        return self.points
 
     def fit_line_between_edges(self, start_edge, end_edge):
         # Given start and end pixels, get equation

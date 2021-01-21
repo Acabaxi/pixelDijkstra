@@ -6,6 +6,31 @@ from skimage.morphology import medial_axis, skeletonize
 
 import flood_fill_distance
 from scipy.optimize import curve_fit
+import piecewise_fit
+
+
+def check_border_intersect(bl, br, tl, tr):
+    if bl[0] != tl[0]:
+        print(bl, br, tl, tr)
+        A1 = (bl[1] - br[1]) / (bl[0] - br[0])
+        A2 = (tl[1] - tr[1]) / (tl[0] - tr[0])
+        b1 = bl[1] - A1 * bl[0]
+        b2 = tl[1] - A2 * tl[0]
+
+        Xa = (b2 - b1) / (A1 - A2)
+        Ya = A1 * Xa + b1
+
+        if ((Xa < max(min(bl[0], br[0]), min(tl[0], tr[0]))) or
+                (Xa > min(max(bl[0], br[0]), max(tl[0], tr[0])))):
+            t = 1
+        else:
+            print("Flip")
+            tmp = tr
+            tr = tl
+            tl = tmp
+            return True
+
+    return False
 
 
 def rgb_draw_img(img_):
@@ -32,7 +57,6 @@ def skeletonize_ocv(img_):
     plt.imshow(skel)
     plt.show()
 
-
     return skel
 
 
@@ -43,9 +67,24 @@ def biggest_contour_line(contour_):
     (contour_[b[1]][0][0], contour_[b[1]][0][1]), 255)
 
 
+def tuple_format(ar_):
+    return ar_[0], ar_[1]
+
+
+def draw_get_contour(img_, contours_, i_):
+    draw_img_ = np.zeros(img_.shape[:2], dtype=np.uint8)
+    draw_img_ = cv.drawContours(draw_img_, contours_, i_, 255, thickness=cv.FILLED, )
+    pts_ = np.where(draw_img_ == 255)
+    # pts_nz = cv.findNonZero(draw_img)
+
+    pts_list_ = list(zip(pts_[0], pts_[1]))
+    pts_list_cv_ = np.array(list(zip(pts_[1], pts_[0])))
+
+    return draw_img_, pts_list_, pts_list_cv_
+
 if __name__ == '__main__':
     print('PyCharm')
-    img = cv.imread("./lines.png", 0)
+    img = cv.imread("./zone_draw.png", 0)
     print(img.shape)
 
     contours, hierarchy = cv.findContours(img, mode=cv.RETR_EXTERNAL, method=cv.CHAIN_APPROX_NONE)
@@ -57,19 +96,14 @@ if __name__ == '__main__':
         hull_points = cv.convexHull(contours[i])
         hulls.append(hull_points)
 
+    zone_boundary_list = []
     for i in range(len(contours)):
-        draw_img = np.zeros(img.shape[:2], dtype=np.uint8)
-        draw_img = cv.drawContours(draw_img, contours, i, 255, thickness=cv.FILLED, )
-        pts = np.where(draw_img == 255)
-        pts_list = list(zip(pts[0], pts[1]))
-        pts_list_cv = np.array(list(zip(pts[1], pts[0])))
-        print(pts_list[0])
+        draw_img, pts_list, pts_list_cv = draw_get_contour(img, contours, i)
 
         # Find contour extremes (Dijkstra)
         ff = flood_fill_distance.FloodFill(draw_img, pts_list)
-        ff.double_run()
-        maps = ff.get_map()
-        sorted_points = ff.sort_points()
+        maps, sorted_points = ff.run()
+
         sorted_points_cv = []
         for pt in sorted_points:
             sorted_points_cv.append(pt[::-1])
@@ -96,30 +130,44 @@ if __name__ == '__main__':
             draw_img_skel[pt] = (255, 0, 0)
         draw_img_skel = cv.polylines(draw_img_skel, [polyline_skel], isClosed=False, color=(255, 255, 0))
 
-        plt.figure()
-        plt.title("Medial")
-        plt.imshow(draw_img_skel)
-        plt.show()
+        # plt.figure()
+        # plt.title("Medial")
+        # plt.imshow(draw_img_skel)
+        # plt.show()
 
+        line_obj = piecewise_fit.LineClass(np.squeeze(polyline_skel))
+        zone_boundary_list.append(line_obj)
         # Polyline entire shape
         # Less clean results
-        draw_img_2 = rgb_draw_img(draw_img)
-        polyline = cv.approxPolyDP(np.array(sorted_points_cv), epsilon=10, closed=False)
-        draw_img_2 = cv.drawContours(draw_img_2, contours, i, (0, 0, 255), thickness=cv.FILLED, )
-        draw_img_2 = cv.polylines(draw_img_2, [polyline], isClosed=False, color=(255, 255, 0))
-
-        plt.figure()
-        plt.title("Approx poly")
-        plt.imshow(draw_img_2)
-        plt.show()
-
-
-
-
+        # draw_img_2 = rgb_draw_img(draw_img)
+        # polyline = cv.approxPolyDP(np.array(sorted_points_cv), epsilon=10, closed=False)
+        # draw_img_2 = cv.drawContours(draw_img_2, contours, i, (0, 0, 255), thickness=cv.FILLED, )
+        # draw_img_2 = cv.polylines(draw_img_2, [polyline], isClosed=False, color=(255, 255, 0))
+        #
         # plt.figure()
-        # plt.imshow(maps)
+        # plt.title("Approx poly")
+        # plt.imshow(draw_img_2)
         # plt.show()
-        print("Hull points", len(hulls[i]))
-    print(len(contours))
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+    # zone_boundary_list[1].flip_line()
+    # left_limits = [zone_boundary_list[0][0][0], zone_boundary_list[0][-1][0]]
+    left_limits = zone_boundary_list[0].get_limits()
+    # right_limits = [zone_boundary_list[1][0][0], zone_boundary_list[1][-1][0]]
+    right_limits = zone_boundary_list[1].get_limits()
+
+    if check_border_intersect(left_limits[0], right_limits[0], left_limits[1], right_limits[1]):
+        print("Flipping")
+        zone_boundary_list[0].flip_line()
+
+    zz = np.zeros(img.shape[:2], dtype=np.uint8)
+    zz = cv.polylines(zz, [zone_boundary_list[0].get_points()], color=255, isClosed=False)
+    zz = cv.polylines(zz, [zone_boundary_list[1].get_points()], color=255, isClosed=False)
+
+    zz = cv.line(zz, tuple_format(zone_boundary_list[0].get_limits()[0]), tuple_format(zone_boundary_list[1].get_limits()[0]), color=255)
+    zz = cv.line(zz, tuple_format(zone_boundary_list[0].get_limits()[1]),
+                 tuple_format(zone_boundary_list[1].get_limits()[1]), color=255)
+
+    plt.figure()
+    plt.imshow(zz)
+    plt.show()
+

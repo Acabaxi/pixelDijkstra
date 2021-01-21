@@ -78,3 +78,10 @@ class FloodFill:
     def sort_points(self):
         sorted_list = sorted(self.points, key=lambda x: self.map[x])
         return sorted_list
+
+    def run(self):
+        self.double_run()
+        maps = self.get_map()
+        sorted_pts = self.sort_points()
+
+        return maps, sorted_pts
