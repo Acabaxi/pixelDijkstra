@@ -56,7 +56,7 @@ def draw_get_contour(img_, contours_, i_):
 
 
 def clean_big_objects(img_):
-    elem = cv.getStructuringElement(cv.MORPH_RECT, (10, 10))
+    elem = cv.getStructuringElement(cv.MORPH_RECT, (20, 20))
     ay = cv.morphologyEx(img, cv.MORPH_OPEN, elem)
     ay = cv.dilate(ay, elem)
     ay = cv.subtract(img_, ay)
@@ -66,12 +66,39 @@ def clean_big_objects(img_):
 
 if __name__ == '__main__':
     print('PyCharm')
-    img = cv.imread("./zone_draw_hard.png", 0)
+    img = cv.imread("./blue_mask.png", 0)
     print(img.shape)
 
     img = clean_big_objects(img)
 
+    elem = cv.getStructuringElement(cv.MORPH_RECT, (5, 5))
+    ay = cv.morphologyEx(img, cv.MORPH_OPEN, elem)
+
+
+
     contours, hierarchy = cv.findContours(img, mode=cv.RETR_EXTERNAL, method=cv.CHAIN_APPROX_NONE)
+    dc = np.zeros(img.shape[:2], dtype=np.uint8)
+    filt_contours = []
+    cont_areas = []
+    filt_hier = []
+    for cont in range(len(contours)):
+        area = cv.contourArea(contours[cont])
+        if area > 500:
+            dc = cv.drawContours(dc, contours, cont, color=255)
+
+            filt_contours.append(contours[cont])
+            cont_areas.append(area)
+            # filt_hier.append(hierarchy[cont])
+
+    sorted_args = np.argsort(cont_areas)[::-1]
+
+    for a in sorted_args:
+        print(cont_areas[a])
+    contours = [filt_contours[sorted_args[1]], filt_contours[sorted_args[2]]]
+    # hierarchy = filt_hier
+    plt.figure()
+    plt.imshow(dc)
+    plt.show()
 
     hulls = []
     for i in range(len(contours)):
@@ -94,7 +121,7 @@ if __name__ == '__main__':
 
         # Skeletonize before approxPolyDP
         # Neater results than with whole shape
-        skel_img = draw_img.astype(np.float64) / 255. # Skeletonize needs float
+        skel_img = draw_img.astype(np.float64) / 255. #Skeletonize needs float
         skel = skeletonize(skel_img)
         skel_pts = np.where(skel == 1)
 
@@ -114,10 +141,10 @@ if __name__ == '__main__':
             draw_img_skel[pt] = (255, 0, 0)
         draw_img_skel = cv.polylines(draw_img_skel, [polyline_skel], isClosed=False, color=(255, 255, 0))
 
-        # plt.figure()
-        # plt.title("Medial")
-        # plt.imshow(draw_img_skel)
-        # plt.show()
+        plt.figure()
+        plt.title("Medial")
+        plt.imshow(draw_img_skel)
+        plt.show()
 
         line_obj = piecewise_fit.LineClass(np.squeeze(polyline_skel))
         zone_boundary_list.append(line_obj)
@@ -134,7 +161,7 @@ if __name__ == '__main__':
         # plt.show()
 
     region_obj = piecewise_fit.LineRegion(zone_boundary_list)
-    aa = region_obj.draw_boundary_polyline(img.shape)
+    aa = region_obj.draw_boundary_polyline(img.shape, isClosed_=True)
 
     sub_line = zone_boundary_list[0].get_points()[:2]
     sub_line_2 = zone_boundary_list[1].get_points()[-2:]

@@ -107,7 +107,7 @@ class LineRegion:
 
         self.boundary_polyline = np.vstack([self.boundary_lines[0].get_points(), self.boundary_lines[1].get_points()])
 
-    def draw_boundary_polyline(self, img_shape):
+    def draw_boundary_polyline(self, img_shape, isClosed_=False):
         if len(self.boundary_polyline) == 0:
             self.create_boundary_polyline()
 
@@ -117,7 +117,7 @@ class LineRegion:
             shape_ = img_shape
 
         zz = np.zeros(shape_, dtype=np.uint8)
-        zz = cv.polylines(zz, [self.boundary_polyline], color=255, isClosed=False)
+        zz = cv.polylines(zz, [self.boundary_polyline], color=255, isClosed=isClosed_)
         return zz
         # zz = cv.polylines(zz, [zone_boundary_list[0].get_points()], color=255, isClosed=False)
         # zz = cv.polylines(zz, [zone_boundary_list[1].get_points()], color=255, isClosed=False)
