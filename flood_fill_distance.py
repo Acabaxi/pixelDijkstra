@@ -3,6 +3,14 @@ import matplotlib.pyplot as plt
 import math
 
 
+def is_between(value, minimum, maximum):
+    if value > minimum:
+        if value < maximum:
+            return True
+
+    return False
+
+
 class FloodFill:
     def __init__(self, image, points):
         self.image_shape = image.shape[:2]
@@ -17,30 +25,42 @@ class FloodFill:
         self.point_q = [points[0]]
 
     def fill(self, point_tuple, distance):
+        to_visit = ((0, -1), (0, 1), (1, 0), (-1, 0), (-1, -1), (-1, 1), (1, -1), (1, 1))
 
-        if point_tuple[0] - 1 > 0:
-            if (not self.visited[(point_tuple[0] - 1, point_tuple[1])]) & (self.inside_pts[(point_tuple[0] - 1, point_tuple[1])]):
-                if self.map[(point_tuple[0] - 1, point_tuple[1])] > self.map[point_tuple] + 1:
-                    self.map[(point_tuple[0] - 1, point_tuple[1])] = self.map[point_tuple] + 1
-                self.add_to_q((point_tuple[0] - 1, point_tuple[1]))
+        for x_offset, y_offset in to_visit:
+            new_point_x = point_tuple[0] + x_offset
+            new_point_y = point_tuple[1] + y_offset
 
-        if point_tuple[0] + 1 < self.image_shape[0]:
-            if (not self.visited[(point_tuple[0] + 1, point_tuple[1])]) & (self.inside_pts[(point_tuple[0] + 1, point_tuple[1])]):
-                if self.map[(point_tuple[0] + 1, point_tuple[1])] > self.map[point_tuple] + 1:
-                    self.map[(point_tuple[0] + 1, point_tuple[1])] = self.map[point_tuple] + 1
-                self.add_to_q((point_tuple[0] + 1, point_tuple[1]))
-
-        if point_tuple[1] - 1 > 0:
-            if (not self.visited[(point_tuple[0], point_tuple[1] - 1)]) & (self.inside_pts[(point_tuple[0], point_tuple[1] - 1)]):
-                if self.map[(point_tuple[0], point_tuple[1] - 1)] > self.map[point_tuple] + 1:
-                    self.map[(point_tuple[0], point_tuple[1] - 1)] = self.map[point_tuple] + 1
-                self.add_to_q((point_tuple[0], point_tuple[1] - 1))
-
-        if point_tuple[1] + 1 < self.image_shape[1]:
-            if (not self.visited[(point_tuple[0], point_tuple[1] + 1)]) & (self.inside_pts[(point_tuple[0], point_tuple[1] + 1)]):
-                if self.map[(point_tuple[0], point_tuple[1] + 1)] > self.map[point_tuple] + 1:
-                    self.map[(point_tuple[0], point_tuple[1] + 1)] = self.map[point_tuple] + 1
-                self.add_to_q((point_tuple[0], point_tuple[1] + 1))
+            if is_between(new_point_x, 0, self.image_shape[0]) and is_between(new_point_y, 0, self.image_shape[1]):
+                if (not self.visited[(new_point_x, new_point_y)]) & (
+                self.inside_pts[(new_point_x, new_point_y)]):
+                    if self.map[(new_point_x, new_point_y)] > self.map[point_tuple] + 1:
+                        self.map[(new_point_x, new_point_y)] = self.map[point_tuple] + 1
+                    self.add_to_q((new_point_x, new_point_y))
+        #
+        # if point_tuple[0] - 1 > 0:
+        #     if (not self.visited[(point_tuple[0] - 1, point_tuple[1])]) & (self.inside_pts[(point_tuple[0] - 1, point_tuple[1])]):
+        #         if self.map[(point_tuple[0] - 1, point_tuple[1])] > self.map[point_tuple] + 1:
+        #             self.map[(point_tuple[0] - 1, point_tuple[1])] = self.map[point_tuple] + 1
+        #         self.add_to_q((point_tuple[0] - 1, point_tuple[1]))
+        #
+        # if point_tuple[0] + 1 < self.image_shape[0]:
+        #     if (not self.visited[(point_tuple[0] + 1, point_tuple[1])]) & (self.inside_pts[(point_tuple[0] + 1, point_tuple[1])]):
+        #         if self.map[(point_tuple[0] + 1, point_tuple[1])] > self.map[point_tuple] + 1:
+        #             self.map[(point_tuple[0] + 1, point_tuple[1])] = self.map[point_tuple] + 1
+        #         self.add_to_q((point_tuple[0] + 1, point_tuple[1]))
+        #
+        # if point_tuple[1] - 1 > 0:
+        #     if (not self.visited[(point_tuple[0], point_tuple[1] - 1)]) & (self.inside_pts[(point_tuple[0], point_tuple[1] - 1)]):
+        #         if self.map[(point_tuple[0], point_tuple[1] - 1)] > self.map[point_tuple] + 1:
+        #             self.map[(point_tuple[0], point_tuple[1] - 1)] = self.map[point_tuple] + 1
+        #         self.add_to_q((point_tuple[0], point_tuple[1] - 1))
+        #
+        # if point_tuple[1] + 1 < self.image_shape[1]:
+        #     if (not self.visited[(point_tuple[0], point_tuple[1] + 1)]) & (self.inside_pts[(point_tuple[0], point_tuple[1] + 1)]):
+        #         if self.map[(point_tuple[0], point_tuple[1] + 1)] > self.map[point_tuple] + 1:
+        #             self.map[(point_tuple[0], point_tuple[1] + 1)] = self.map[point_tuple] + 1
+        #         self.add_to_q((point_tuple[0], point_tuple[1] + 1))
 
         self.visited[point_tuple] = True
 
