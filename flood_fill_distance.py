@@ -4,7 +4,7 @@ import math
 
 
 def is_between(value, minimum, maximum):
-    if value > minimum:
+    if value >= minimum:
         if value < maximum:
             return True
 

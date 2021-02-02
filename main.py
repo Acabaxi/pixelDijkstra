@@ -8,6 +8,10 @@ import flood_fill_distance
 from scipy.optimize import curve_fit
 import piecewise_fit
 
+import skely_prune
+from skan import draw
+
+
 
 def rgb_draw_img(img_):
     new_shape = img_.shape[:2] + (3,)
@@ -55,8 +59,8 @@ def draw_get_contour(img_, contours_, i_):
     return draw_img_, pts_list_, pts_list_cv_
 
 
-def clean_big_objects(img_):
-    elem = cv.getStructuringElement(cv.MORPH_RECT, (20, 20))
+def clean_big_objects(img_, size):
+    elem = cv.getStructuringElement(cv.MORPH_RECT, (size, size))
     ay = cv.morphologyEx(img, cv.MORPH_OPEN, elem)
     ay = cv.dilate(ay, elem)
     ay = cv.subtract(img_, ay)
@@ -66,15 +70,16 @@ def clean_big_objects(img_):
 
 if __name__ == '__main__':
     print('PyCharm')
-    img = cv.imread("./blue_mask.png", 0)
+    img = cv.imread("./IMG_7484_mask.png", 0)
     print(img.shape)
 
-    img = clean_big_objects(img)
+    img = clean_big_objects(img, 50)
 
+    plt.figure()
+    plt.imshow(img)
+    plt.show()
     elem = cv.getStructuringElement(cv.MORPH_RECT, (5, 5))
     ay = cv.morphologyEx(img, cv.MORPH_OPEN, elem)
-
-
 
     contours, hierarchy = cv.findContours(img, mode=cv.RETR_EXTERNAL, method=cv.CHAIN_APPROX_NONE)
     dc = np.zeros(img.shape[:2], dtype=np.uint8)
@@ -94,30 +99,33 @@ if __name__ == '__main__':
 
     for a in sorted_args:
         print(cont_areas[a])
-    contours = [filt_contours[sorted_args[1]], filt_contours[sorted_args[2]]]
+    contours = [filt_contours[sorted_args[0]], filt_contours[sorted_args[1]]]
     # hierarchy = filt_hier
     plt.figure()
     plt.imshow(dc)
     plt.show()
 
     hulls = []
-    for i in range(len(contours)):
-
-        # print(np.squeeze(contours[0]))
-        hull_points = cv.convexHull(contours[i])
-        hulls.append(hull_points)
+    # for i in range(len(contours)):
+    #
+    #     # print(np.squeeze(contours[0]))
+    #     hull_points = cv.convexHull(contours[i])
+    #     hulls.append(hull_points)
 
     zone_boundary_list = []
     for i in range(len(contours)):
         draw_img, pts_list, pts_list_cv = draw_get_contour(img, contours, i)
+        print(len(pts_list))
+        print(pts_list_cv.shape)
+
 
         # Find contour extremes (Dijkstra)
         ff = flood_fill_distance.FloodFill(draw_img, pts_list)
         maps, sorted_points = ff.run()
-
-        sorted_points_cv = []
-        for pt in sorted_points:
-            sorted_points_cv.append(pt[::-1])
+        #
+        # sorted_points_cv = []
+        # for pt in sorted_points:
+        #     sorted_points_cv.append(pt[::-1])
 
         # Skeletonize before approxPolyDP
         # Neater results than with whole shape
@@ -127,15 +135,28 @@ if __name__ == '__main__':
 
         skel_pts = list(zip(skel_pts[0], skel_pts[1]))
         # sort pixels according to their distance on distance map
-        skel_pts = sorted(skel_pts, key=lambda x: maps[x])
+        # skel_pts = sorted(skel_pts, key=lambda x: maps[x])
         skel_pts_cv = []
         # Python libs (skeletonize) return pixels in a (Y,X) order
         for pt in skel_pts: # Flip pixel order to match (X,Y) of OpenCV
             skel_pts_cv.append(pt[::-1])
 
+        #SKelly prune
+
+        skel = skely_prune.to_graph(skel, img)
+        skel_pts = np.where(skel == 1)
+
+        skel_pts = list(zip(skel_pts[0], skel_pts[1]))
+        # sort pixels according to their distance on distance map
+        skel_pts = sorted(skel_pts, key=lambda x: maps[x])
+        skel_pts_cv = []
+        # Python libs (skeletonize) return pixels in a (Y,X) order
+        for pt in skel_pts:  # Flip pixel order to match (X,Y) of OpenCV
+            skel_pts_cv.append(pt[::-1])
+
         # Skeleton polyline
         draw_img_skel = rgb_draw_img(draw_img)
-        polyline_skel = cv.approxPolyDP(np.array(skel_pts_cv), epsilon=5, closed=False)
+        polyline_skel = cv.approxPolyDP(np.array(skel_pts_cv), epsilon=20, closed=False)
         draw_img_skel = cv.drawContours(draw_img_skel, contours, i, (0, 0, 255), thickness=cv.FILLED, )
         for pt in skel_pts:
             draw_img_skel[pt] = (255, 0, 0)
