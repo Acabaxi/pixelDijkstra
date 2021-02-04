@@ -103,9 +103,15 @@ class FloodFill:
         sorted_list = sorted(self.points, key=lambda x: self.map[x])
         return sorted_list
 
-    def run(self):
+    def run(self, show = False):
         self.double_run()
         maps = self.get_map()
         sorted_pts = self.sort_points()
+
+        if show:
+            plt.figure()
+            plt.title("Distance map")
+            plt.imshow(maps)
+            plt.show()
 
         return maps, sorted_pts

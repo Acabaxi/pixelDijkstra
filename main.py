@@ -2,7 +2,7 @@ import cv2 as cv
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.spatial.distance import cdist
-from skimage.morphology import medial_axis, skeletonize
+from skimage.morphology import medial_axis, skeletonize, binary_dilation
 
 import flood_fill_distance
 from scipy.optimize import curve_fit
@@ -10,7 +10,6 @@ import piecewise_fit
 
 import skely_prune
 from skan import draw
-
 
 
 def rgb_draw_img(img_):
@@ -68,6 +67,43 @@ def clean_big_objects(img_, size):
     return ay
 
 
+def split_line_choose_region(line_skeleton, show_=False):
+    line_skeleton_tmp = np.array(line_skeleton, dtype=np.uint8) * 255
+
+    # Crop region including line skeleton
+    rect = cv.boundingRect(np.array(line_skeleton_tmp))
+    x, y, w, h = rect
+    line_skel_crop = line_skeleton_tmp[y:y + h, x + x:w]
+
+    if show_:
+        plt.figure()
+        plt.title("BB")
+        plt.imshow(line_skel_crop)
+        plt.show()
+
+    all_ones = np.ones(line_skel_crop.shape, dtype=np.uint8) * 255
+    inv_skel = all_ones - line_skel_crop
+    ret, labels, stats, centroids = cv.connectedComponentsWithStats(inv_skel, connectivity=4)
+    un = np.unique(labels)
+
+    # Descobrir label da regiao de area maxima
+    max_label = max(range(stats.shape[0]), key=lambda kk: stats[kk][4])
+    pp = np.where(labels == max_label)
+
+    mask_ = np.zeros(line_skeleton.shape, dtype=np.uint8)
+    mask_[pp] = 255
+
+    if show_:
+        print("Num zones", un)
+        print("Zone stats", stats)
+        plt.figure()
+        plt.title("maks")
+        plt.imshow(mask_)
+        plt.show()
+
+    return mask_
+
+
 if __name__ == '__main__':
     print('PyCharm')
     img = cv.imread("./IMG_7484_mask.png", 0)
@@ -115,38 +151,24 @@ if __name__ == '__main__':
     zone_boundary_list = []
     for i in range(len(contours)):
         draw_img, pts_list, pts_list_cv = draw_get_contour(img, contours, i)
-        print(len(pts_list))
-        print(pts_list_cv.shape)
-
-
-        # Find contour extremes (Dijkstra)
-        ff = flood_fill_distance.FloodFill(draw_img, pts_list)
-        maps, sorted_points = ff.run()
-        #
-        # sorted_points_cv = []
-        # for pt in sorted_points:
-        #     sorted_points_cv.append(pt[::-1])
 
         # Skeletonize before approxPolyDP
         # Neater results than with whole shape
         skel_img = draw_img.astype(np.float64) / 255. #Skeletonize needs float
         skel = skeletonize(skel_img)
-        skel_pts = np.where(skel == 1)
-
-        skel_pts = list(zip(skel_pts[0], skel_pts[1]))
-        # sort pixels according to their distance on distance map
-        # skel_pts = sorted(skel_pts, key=lambda x: maps[x])
-        skel_pts_cv = []
-        # Python libs (skeletonize) return pixels in a (Y,X) order
-        for pt in skel_pts: # Flip pixel order to match (X,Y) of OpenCV
-            skel_pts_cv.append(pt[::-1])
 
         #SKelly prune
-
         skel = skely_prune.to_graph(skel, img)
-        skel_pts = np.where(skel == 1)
 
+        skel_pts = np.where(skel == 1)
         skel_pts = list(zip(skel_pts[0], skel_pts[1]))
+
+
+        split_line_choose_region(skel)
+
+        # Find skeleton extremes (Dijkstra)
+        ff = flood_fill_distance.FloodFill(skel, skel_pts)
+        maps, sorted_points = ff.run(show=True)
         # sort pixels according to their distance on distance map
         skel_pts = sorted(skel_pts, key=lambda x: maps[x])
         skel_pts_cv = []
@@ -156,7 +178,7 @@ if __name__ == '__main__':
 
         # Skeleton polyline
         draw_img_skel = rgb_draw_img(draw_img)
-        polyline_skel = cv.approxPolyDP(np.array(skel_pts_cv), epsilon=20, closed=False)
+        polyline_skel = cv.approxPolyDP(np.array(skel_pts_cv), epsilon=10, closed=False)
         draw_img_skel = cv.drawContours(draw_img_skel, contours, i, (0, 0, 255), thickness=cv.FILLED, )
         for pt in skel_pts:
             draw_img_skel[pt] = (255, 0, 0)

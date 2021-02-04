@@ -29,14 +29,9 @@ def to_graph(skeletony, img_):
 
         # https://github.com/jni/skan/issues/92
         branch_data = summarize(skeleton_obj)
-        #
-        # plt.figure()
-        # plt.title("Branch stats")
-        # draw.overlay_euclidean_skeleton_2d(skeletony, branch_data)
 
         thres = 100
 
-        # p_list = skeleton_obj.paths_list()
         bt = branch_data['branch-type'].value_counts()
 
         if 1 in bt.keys():
