@@ -67,13 +67,53 @@ def clean_big_objects(img_, size):
     return ay
 
 
-def split_line_choose_region(line_skeleton, show_=False):
+def split_line_choose_region(line_skeleton, show_=False, rotated_rect=-1):
+    """Rotated_rect: \n
+    -1: Upright rectangle \n
+    0:  minAreaRect; Rotated rectangle \n
+    1:  Convex Hull \n
+    2;  Fit ellipse; Doesnt work quite well \n
+    """
     line_skeleton_tmp = np.array(line_skeleton, dtype=np.uint8) * 255
+    viz_copy = line_skeleton_tmp.copy()
 
     # Crop region including line skeleton
-    rect = cv.boundingRect(np.array(line_skeleton_tmp))
-    x, y, w, h = rect
-    line_skel_crop = line_skeleton_tmp[y:y + h, x + x:w]
+    all_ones = np.zeros(line_skeleton_tmp.shape, dtype=np.uint8)
+    line_skel_crop = line_skeleton_tmp  # [y:y + h, x + x:w]
+    if rotated_rect == -1:
+        rect = cv.boundingRect(np.array(line_skeleton_tmp))
+        x, y, w, h = rect
+
+        # all_ones = np.ones(line_skeleton_tmp.shape, dtype=np.uint8) * 255
+        all_ones = np.zeros(line_skeleton_tmp.shape, dtype=np.uint8)
+        all_ones[y:y + h, x + x:w] = 255
+
+    if rotated_rect == 0:
+        # minAreaRect (convexHull) needs list of points, not image
+        idx_ = cv.findNonZero(line_skeleton_tmp)
+        rect = cv.minAreaRect(idx_)
+
+        box_pts = np.int0(cv.boxPoints(rect))
+        cv.drawContours(all_ones, [box_pts], 0, color=255, thickness=cv.FILLED)
+
+    elif rotated_rect == 1:
+        cc, hie = cv.findContours(line_skeleton_tmp, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+        hl = []
+        for asd in range(len(cc)):
+            hull = cv.convexHull(cc[asd])
+            hl.append(hull)
+
+        for asd in range(len(cc)):
+            cv.drawContours(viz_copy, hl, asd, color=255)
+
+    # elif rotated_rect == 2:
+    #     elipse_pts = cv.fitEllipse(idx_)
+    #     cv.ellipse(viz_copy, elipse_pts, color=255)
+
+    plt.figure()
+    plt.title("Elipse")
+    plt.imshow(viz_copy)
+    plt.show()
 
     if show_:
         plt.figure()
@@ -81,13 +121,16 @@ def split_line_choose_region(line_skeleton, show_=False):
         plt.imshow(line_skel_crop)
         plt.show()
 
-    all_ones = np.ones(line_skel_crop.shape, dtype=np.uint8) * 255
     inv_skel = all_ones - line_skel_crop
+    plt.figure()
+    plt.title("maks")
+    plt.imshow(inv_skel)
+    plt.show()
     ret, labels, stats, centroids = cv.connectedComponentsWithStats(inv_skel, connectivity=4)
     un = np.unique(labels)
 
     # Descobrir label da regiao de area maxima
-    max_label = max(range(stats.shape[0]), key=lambda kk: stats[kk][4])
+    max_label = max(range(1,stats.shape[0]), key=lambda kk: stats[kk][4])
     pp = np.where(labels == max_label)
 
     mask_ = np.zeros(line_skeleton.shape, dtype=np.uint8)
@@ -163,8 +206,7 @@ if __name__ == '__main__':
         skel_pts = np.where(skel == 1)
         skel_pts = list(zip(skel_pts[0], skel_pts[1]))
 
-
-        split_line_choose_region(skel)
+        split_line_choose_region(skel, True)
 
         # Find skeleton extremes (Dijkstra)
         ff = flood_fill_distance.FloodFill(skel, skel_pts)
