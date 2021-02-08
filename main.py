@@ -75,26 +75,35 @@ def split_line_choose_region(line_skeleton, show_=False, rotated_rect=-1):
     2;  Fit ellipse; Doesnt work quite well \n
     """
     line_skeleton_tmp = np.array(line_skeleton, dtype=np.uint8) * 255
+    plt.figure()
+    plt.title("Split image")
+    plt.imshow(line_skeleton_tmp)
+    plt.figure()
+
     viz_copy = line_skeleton_tmp.copy()
 
     # Crop region including line skeleton
     all_ones = np.zeros(line_skeleton_tmp.shape, dtype=np.uint8)
-    line_skel_crop = line_skeleton_tmp  # [y:y + h, x + x:w]
+    line_skel_crop = line_skeleton_tmp.copy()  # [y:y + h, x + x:w]
+    plt.figure()
+    plt.title("All ones")
+    plt.imshow(line_skeleton_tmp)
+    plt.show()
     if rotated_rect == -1:
         rect = cv.boundingRect(np.array(line_skeleton_tmp))
         x, y, w, h = rect
-
+        print("Rectangle", rect)
         # all_ones = np.ones(line_skeleton_tmp.shape, dtype=np.uint8) * 255
         all_ones = np.zeros(line_skeleton_tmp.shape, dtype=np.uint8)
-        all_ones[y:y + h, x + x:w] = 255
+        all_ones[y:y + h, x:x + w] = 255
 
     if rotated_rect == 0:
         # minAreaRect (convexHull) needs list of points, not image
         idx_ = cv.findNonZero(line_skeleton_tmp)
         rect = cv.minAreaRect(idx_)
-
         box_pts = np.int0(cv.boxPoints(rect))
-        cv.drawContours(all_ones, [box_pts], 0, color=255, thickness=cv.FILLED)
+        print("Box poibnts", box_pts, box_pts*0.9)
+        cv.drawContours(all_ones, [np.int0(box_pts*0.9)], 0, color=255, thickness=cv.FILLED)
 
     elif rotated_rect == 1:
         cc, hie = cv.findContours(line_skeleton_tmp, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
@@ -106,15 +115,6 @@ def split_line_choose_region(line_skeleton, show_=False, rotated_rect=-1):
         for asd in range(len(cc)):
             cv.drawContours(viz_copy, hl, asd, color=255)
 
-    # elif rotated_rect == 2:
-    #     elipse_pts = cv.fitEllipse(idx_)
-    #     cv.ellipse(viz_copy, elipse_pts, color=255)
-
-    plt.figure()
-    plt.title("Elipse")
-    plt.imshow(viz_copy)
-    plt.show()
-
     if show_:
         plt.figure()
         plt.title("BB")
@@ -123,14 +123,14 @@ def split_line_choose_region(line_skeleton, show_=False, rotated_rect=-1):
 
     inv_skel = all_ones - line_skel_crop
     plt.figure()
-    plt.title("maks")
+    plt.title("inv mask")
     plt.imshow(inv_skel)
     plt.show()
     ret, labels, stats, centroids = cv.connectedComponentsWithStats(inv_skel, connectivity=4)
     un = np.unique(labels)
 
     # Descobrir label da regiao de area maxima
-    max_label = max(range(1,stats.shape[0]), key=lambda kk: stats[kk][4])
+    max_label = max(range(1, stats.shape[0]), key=lambda kk: stats[kk][4])
     pp = np.where(labels == max_label)
 
     mask_ = np.zeros(line_skeleton.shape, dtype=np.uint8)
@@ -149,7 +149,7 @@ def split_line_choose_region(line_skeleton, show_=False, rotated_rect=-1):
 
 if __name__ == '__main__':
     print('PyCharm')
-    img = cv.imread("./IMG_7484_mask.png", 0)
+    img = cv.imread("./line_mask.png", 0)
     print(img.shape)
 
     img = clean_big_objects(img, 50)
@@ -169,7 +169,6 @@ if __name__ == '__main__':
         area = cv.contourArea(contours[cont])
         if area > 500:
             dc = cv.drawContours(dc, contours, cont, color=255)
-
             filt_contours.append(contours[cont])
             cont_areas.append(area)
             # filt_hier.append(hierarchy[cont])
@@ -178,11 +177,9 @@ if __name__ == '__main__':
 
     for a in sorted_args:
         print(cont_areas[a])
-    contours = [filt_contours[sorted_args[0]], filt_contours[sorted_args[1]]]
+    # contours = [filt_contours[sorted_args[0]], filt_contours[sorted_args[1]]]
+    contours = [filt_contours[sorted_args[0]]]
     # hierarchy = filt_hier
-    plt.figure()
-    plt.imshow(dc)
-    plt.show()
 
     hulls = []
     # for i in range(len(contours)):
@@ -192,8 +189,11 @@ if __name__ == '__main__':
     #     hulls.append(hull_points)
 
     zone_boundary_list = []
-    for i in range(len(contours)):
-        draw_img, pts_list, pts_list_cv = draw_get_contour(img, contours, i)
+    for i in range(len(filt_contours)):
+        area = cv.contourArea(filt_contours[i])
+        if area < 500:
+            continue
+        draw_img, pts_list, pts_list_cv = draw_get_contour(dc, filt_contours, i)
 
         # Skeletonize before approxPolyDP
         # Neater results than with whole shape
@@ -206,7 +206,7 @@ if __name__ == '__main__':
         skel_pts = np.where(skel == 1)
         skel_pts = list(zip(skel_pts[0], skel_pts[1]))
 
-        split_line_choose_region(skel, True)
+        split_line_choose_region(skel, True, rotated_rect=0)
 
         # Find skeleton extremes (Dijkstra)
         ff = flood_fill_distance.FloodFill(skel, skel_pts)
