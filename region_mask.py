@@ -5,11 +5,10 @@ from scipy.spatial.distance import cdist
 from skimage.morphology import medial_axis, skeletonize, binary_dilation
 
 import flood_fill_distance
-from scipy.optimize import curve_fit
+
 import piecewise_fit
 
 import skely_prune
-from skan import draw
 
 
 def rgb_draw_img(img_):
@@ -59,6 +58,7 @@ def draw_get_contour(img_, contours_, i_):
 
 
 def clean_big_objects(img_, size):
+    """"Removes regions larger than a rectangle of size <size>"""
     elem = cv.getStructuringElement(cv.MORPH_RECT, (size, size))
     ay = cv.morphologyEx(img, cv.MORPH_OPEN, elem)
     ay = cv.dilate(ay, elem)
@@ -75,20 +75,12 @@ def split_line_choose_region(line_skeleton, show_=False, rotated_rect=-1):
     2;  Fit ellipse; Doesnt work quite well \n
     """
     line_skeleton_tmp = np.array(line_skeleton, dtype=np.uint8) * 255
-    plt.figure()
-    plt.title("Split image")
-    plt.imshow(line_skeleton_tmp)
-    plt.figure()
-
     viz_copy = line_skeleton_tmp.copy()
 
     # Crop region including line skeleton
     all_ones = np.zeros(line_skeleton_tmp.shape, dtype=np.uint8)
     line_skel_crop = line_skeleton_tmp.copy()  # [y:y + h, x + x:w]
-    plt.figure()
-    plt.title("All ones")
-    plt.imshow(line_skeleton_tmp)
-    plt.show()
+
     if rotated_rect == -1:
         rect = cv.boundingRect(np.array(line_skeleton_tmp))
         x, y, w, h = rect
@@ -102,8 +94,8 @@ def split_line_choose_region(line_skeleton, show_=False, rotated_rect=-1):
         idx_ = cv.findNonZero(line_skeleton_tmp)
         rect = cv.minAreaRect(idx_)
         box_pts = np.int0(cv.boxPoints(rect))
-        print("Box poibnts", box_pts, box_pts*0.9)
-        cv.drawContours(all_ones, [np.int0(box_pts*0.9)], 0, color=255, thickness=cv.FILLED)
+        print("Box poibnts", box_pts, box_pts)
+        cv.drawContours(all_ones, [np.int0(box_pts)], 0, color=255, thickness=cv.FILLED)
 
     elif rotated_rect == 1:
         cc, hie = cv.findContours(line_skeleton_tmp, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
@@ -115,17 +107,13 @@ def split_line_choose_region(line_skeleton, show_=False, rotated_rect=-1):
         for asd in range(len(cc)):
             cv.drawContours(viz_copy, hl, asd, color=255)
 
+    inv_skel = all_ones - line_skel_crop
+
     if show_:
         plt.figure()
-        plt.title("BB")
-        plt.imshow(line_skel_crop)
+        plt.title("inv mask")
+        plt.imshow(inv_skel)
         plt.show()
-
-    inv_skel = all_ones - line_skel_crop
-    plt.figure()
-    plt.title("inv mask")
-    plt.imshow(inv_skel)
-    plt.show()
     ret, labels, stats, centroids = cv.connectedComponentsWithStats(inv_skel, connectivity=4)
     un = np.unique(labels)
 
@@ -147,18 +135,56 @@ def split_line_choose_region(line_skeleton, show_=False, rotated_rect=-1):
     return mask_
 
 
-if __name__ == '__main__':
-    print('PyCharm')
-    img = cv.imread("./line_mask.png", 0)
-    print(img.shape)
+def process_segmentation(img_, show_=False):
+    """"Takes a mask of the segmented line, cleans it and returns clean mask\n
+    1. Removes big blobs: the lines we are looking for are thin, not blobs\n
+    2. Finds contours\n
+    3. Removes contours with small areas\n
+    """
+    img_ = clean_big_objects(img_, 50)
 
-    img = clean_big_objects(img, 50)
+    if show_:
+        plt.figure()
+        plt.title("Removed big objects")
+        plt.imshow(img_)
+        plt.show()
 
-    plt.figure()
-    plt.imshow(img)
-    plt.show()
-    elem = cv.getStructuringElement(cv.MORPH_RECT, (5, 5))
-    ay = cv.morphologyEx(img, cv.MORPH_OPEN, elem)
+    contours_, hierarchy_ = cv.findContours(img_, mode=cv.RETR_EXTERNAL, method=cv.CHAIN_APPROX_NONE)
+    draw_contour_img = np.zeros(img.shape[:2], dtype=np.uint8)
+    filt_contours_ = []
+    cont_areas_ = []
+    filt_hier_ = []
+    for contour_num_ in range(len(contours_)):
+        area_ = cv.contourArea(contours_[contour_num_])
+        if area_ > 500:
+            cv.drawContours(draw_contour_img, contours_, contour_num_, color=255, thickness=cv.FILLED)
+            filt_contours_.append(contours_[contour_num_])
+            cont_areas_.append(area_)
+            # filt_hier.append(hierarchy[cont])
+
+    if show_:
+        plt.figure()
+        plt.title("Filtered contours")
+        plt.imshow(draw_contour_img)
+        plt.show()
+
+    return draw_contour_img
+
+
+def get_mask_from_line_segmentation(img_):
+    filtered_image_ = process_segmentation(img_, show_=True)
+
+    skel_img_ = filtered_image_.astype(bool)
+
+    skel_ = skeletonize(skel_img_)
+    skel_ = skely_prune.to_graph(skel_, filtered_image_)
+
+    seg_mask_ = split_line_choose_region(skel_, True, rotated_rect=0)
+
+    return seg_mask_
+
+
+def trash_function_do_not_use():
 
     contours, hierarchy = cv.findContours(img, mode=cv.RETR_EXTERNAL, method=cv.CHAIN_APPROX_NONE)
     dc = np.zeros(img.shape[:2], dtype=np.uint8)
@@ -180,13 +206,6 @@ if __name__ == '__main__':
     # contours = [filt_contours[sorted_args[0]], filt_contours[sorted_args[1]]]
     contours = [filt_contours[sorted_args[0]]]
     # hierarchy = filt_hier
-
-    hulls = []
-    # for i in range(len(contours)):
-    #
-    #     # print(np.squeeze(contours[0]))
-    #     hull_points = cv.convexHull(contours[i])
-    #     hulls.append(hull_points)
 
     zone_boundary_list = []
     for i in range(len(filt_contours)):
@@ -284,3 +303,15 @@ if __name__ == '__main__':
     # plt.show()
 
 
+
+if __name__ == '__main__':
+    print('PyCharm')
+    img = cv.imread("./line_mask.png", 0)
+    print(img.shape)
+
+    seg_mask = get_mask_from_line_segmentation(img)
+
+    plt.figure()
+    plt.title("skeleton")
+    plt.imshow(seg_mask)
+    plt.show()
